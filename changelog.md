@@ -1,5 +1,18 @@
 # Changelog
 
+## [Maintenance] - 2026-10-07
+
+- fix: SINGLE-mode edit of one occurrence in a recurring series now takes effect (it was stored in a map nothing read); the occurrence is split out and the series keeps its count
+- fix: FROM-mode edit starting at a series' first occurrence no longer fails and truncates the original series; a FROM split that conflicts is rolled back
+- fix: FROM and ALL edits now also apply to standalone events sharing the subject instead of aborting midway
+- fix: start/end edits in FROM or ALL mode are rejected before anything changes (a FROM time edit used to cut the series short and then fail)
+- fix: recurring series with a count but no weekdays, or a non-positive count, are rejected instead of looping forever
+- fix: CSV export quotes fields containing commas or quotes (RFC 4180) and import reads them back
+- fix: export honours absolute paths instead of nesting them under the working directory
+- fix: `show status` reports busy at an event's exact start time
+- build: failing tests and coverage below 85% line / 70% branch now fail the build; CI no longer depends on an unconfigured Codecov token
+- chore: removed generated Javadoc, stale PIT reports and scratch files from the repo; tests no longer write CSVs into the project root; JAR renamed to `virtual-calendar.jar`
+
 ## [Sprint 4] - 2025-06-15
 
 - feat: Java Swing GUI providing month view, day detail dialog, and visual event creation/editing

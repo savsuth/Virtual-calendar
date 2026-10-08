@@ -65,7 +65,7 @@ public class CSVImporter implements Importer {
       while ((line = reader.readLine()) != null) {
         lineNumber++;
 
-        String[] tokens = line.split(",", -1);
+        String[] tokens = CsvFormat.parseLine(line);
         if (tokens.length < 9) {
           errorMessages.append("Line ").append(lineNumber)
               .append(": Invalid number of fields.\n");

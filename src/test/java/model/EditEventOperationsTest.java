@@ -9,7 +9,9 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.Test;
 
 /**
@@ -33,17 +35,133 @@ public class EditEventOperationsTest {
     assertEquals("UpdatedMeeting", events.get(0).getSubject());
   }
 
-  @Test(expected = UnsupportedOperationException.class)
-  public void testEditSingleEventUnsupportedMode() throws Exception {
+  @Test
+  public void testEditAllModeRenamesStandaloneEventWithSameSubject() throws Exception {
     CalendarModel model = new CalendarModel();
     CalendarService service = new CalendarService(model);
-    service.addSingleEvent("Meeting",
-        LocalDateTime.of(2025, 5, 1, 10, 0),
-        LocalDateTime.of(2025, 5, 1, 11, 0),
-        "Desc", "Room", true, true);
-    new EditEventOperations().editEvent(model, "Meeting", LocalDateTime.of(2025,
-            5, 1, 10, 0), "subject", "FailUpdate",
-        ICalendarService.EditMode.ALL);
+    service.addRecurringEvent("LaunchPrep", LocalDateTime.of(2023, 9, 6, 14, 0),
+        LocalDateTime.of(2023, 9, 6, 16, 0), "", "", true,
+        Collections.singleton(DayOfWeek.WEDNESDAY), 3, null, true);
+    service.addSingleEvent("LaunchPrep", LocalDateTime.of(2023, 9, 10, 14, 0),
+        LocalDateTime.of(2023, 9, 10, 16, 0), "", "", true, true);
+    new EditEventOperations().editEvent(model, "LaunchPrep", null, "subject",
+        "ProductLaunch", ICalendarService.EditMode.ALL);
+    assertEquals(2, model.getAllEvents().size());
+    for (Event e : model.getAllEvents()) {
+      assertEquals("ProductLaunch", e.getSubject());
+    }
+  }
+
+  @Test
+  public void testEditFromModeRenamesOnlyLaterStandaloneEvents() throws Exception {
+    CalendarModel model = new CalendarModel();
+    CalendarService service = new CalendarService(model);
+    service.addSingleEvent("Sync", LocalDateTime.of(2025, 5, 1, 9, 0),
+        LocalDateTime.of(2025, 5, 1, 10, 0), "", "", true, true);
+    service.addSingleEvent("Sync", LocalDateTime.of(2025, 5, 8, 9, 0),
+        LocalDateTime.of(2025, 5, 8, 10, 0), "", "", true, true);
+    new EditEventOperations().editEvent(model, "Sync", LocalDateTime.of(2025, 5, 5, 0, 0),
+        "subject", "Sync2", ICalendarService.EditMode.FROM);
+    assertEquals("Sync", model.getEventsOn(LocalDate.of(2025, 5, 1)).get(0).getSubject());
+    assertEquals("Sync2", model.getEventsOn(LocalDate.of(2025, 5, 8)).get(0).getSubject());
+  }
+
+  @Test
+  public void testEditSingleOccurrenceOfRecurringEventIsVisible() throws Exception {
+    CalendarModel model = new CalendarModel();
+    CalendarService service = new CalendarService(model);
+    service.addRecurringEvent("Standup", LocalDateTime.of(2025, 6, 2, 9, 0),
+        LocalDateTime.of(2025, 6, 2, 9, 15), "", "", true,
+        Collections.singleton(DayOfWeek.MONDAY), 3, null, false);
+    new EditEventOperations().editEvent(model, "Standup", LocalDateTime.of(2025, 6, 9, 9, 0),
+        "location", "Room 4", ICalendarService.EditMode.SINGLE);
+
+    List<Event> onNinth = model.getEventsOn(LocalDate.of(2025, 6, 9));
+    assertEquals(1, onNinth.size());
+    assertEquals("Room 4", onNinth.get(0).getLocation());
+    assertEquals("", model.getEventsOn(LocalDate.of(2025, 6, 2)).get(0).getLocation());
+    assertEquals(1, model.getEventsOn(LocalDate.of(2025, 6, 16)).size());
+    assertTrue("series must not grow past 3 occurrences",
+        model.getEventsOn(LocalDate.of(2025, 6, 23)).isEmpty());
+  }
+
+  @Test
+  public void testEditSingleOccurrenceConflictLeavesSeriesUnchanged() throws Exception {
+    CalendarModel model = new CalendarModel();
+    CalendarService service = new CalendarService(model);
+    service.addRecurringEvent("Standup", LocalDateTime.of(2025, 6, 2, 9, 0),
+        LocalDateTime.of(2025, 6, 2, 10, 0), "", "", true,
+        Collections.singleton(DayOfWeek.MONDAY), 3, null, false);
+    service.addSingleEvent("Review", LocalDateTime.of(2025, 6, 9, 10, 30),
+        LocalDateTime.of(2025, 6, 9, 11, 30), "", "", true, false);
+    try {
+      new EditEventOperations().editEvent(model, "Standup", LocalDateTime.of(2025, 6, 9, 9, 0),
+          "end", "2025-06-09T11:00", ICalendarService.EditMode.SINGLE);
+      fail("Expected EventConflictException");
+    } catch (EventConflictException expected) {
+      // expected
+    }
+    assertEquals(2, model.getAllEvents().size());
+    assertEquals(LocalDateTime.of(2025, 6, 9, 10, 0),
+        ((RecurringEvent) model.getAllEvents().get(0)).generateOccurrences().get(1)
+            .getEffectiveEndDateTime());
+  }
+
+  @Test
+  public void testEditFromFirstOccurrenceReplacesWholeSeries() throws Exception {
+    CalendarModel model = new CalendarModel();
+    CalendarService service = new CalendarService(model);
+    Set<DayOfWeek> weekdays = EnumSet.range(DayOfWeek.MONDAY, DayOfWeek.FRIDAY);
+    service.addRecurringEvent("DailyScrum", LocalDateTime.of(2025, 5, 1, 8, 0),
+        LocalDateTime.of(2025, 5, 1, 8, 15), "", "", true, weekdays, 4, null, true);
+    new EditEventOperations().editEvent(model, "DailyScrum", LocalDateTime.of(2025, 5, 1, 8, 0),
+        "subject", "MorningScrum", ICalendarService.EditMode.FROM);
+
+    int morning = 0;
+    for (Event series : model.getAllEvents()) {
+      for (Event occ : series.getOccurrences()) {
+        assertEquals("MorningScrum", occ.getSubject());
+        morning++;
+      }
+    }
+    assertEquals(4, morning);
+  }
+
+  @Test
+  public void testEditFromModeTimeChangeIsRejectedWithoutTouchingSeries() throws Exception {
+    CalendarModel model = new CalendarModel();
+    CalendarService service = new CalendarService(model);
+    service.addRecurringEvent("Class", LocalDateTime.of(2025, 6, 2, 9, 0),
+        LocalDateTime.of(2025, 6, 2, 10, 0), "", "", true,
+        Collections.singleton(DayOfWeek.MONDAY), 3, null, true);
+    try {
+      new EditEventOperations().editEvent(model, "Class", LocalDateTime.of(2025, 6, 9, 9, 0),
+          "start", "2025-06-09T08:00", ICalendarService.EditMode.FROM);
+      fail("Expected UnsupportedOperationException");
+    } catch (UnsupportedOperationException expected) {
+      // expected
+    }
+    assertEquals(3, ((RecurringEvent) model.getAllEvents().get(0)).generateOccurrences().size());
+  }
+
+  @Test
+  public void testEditFromConflictRestoresOriginalSeries() throws Exception {
+    CalendarModel model = new CalendarModel();
+    CalendarService service = new CalendarService(model);
+    service.addRecurringEvent("Class", LocalDateTime.of(2025, 6, 2, 9, 0),
+        LocalDateTime.of(2025, 6, 2, 10, 0), "", "", true,
+        Collections.singleton(DayOfWeek.MONDAY), 3, null, true);
+    service.addSingleEvent("Exam", LocalDateTime.of(2025, 6, 9, 9, 0),
+        LocalDateTime.of(2025, 6, 9, 9, 30), "", "", true, false);
+    try {
+      new EditEventOperations().editEvent(model, "Class", LocalDateTime.of(2025, 6, 9, 9, 0),
+          "location", "Hall B", ICalendarService.EditMode.FROM);
+      fail("Expected EventConflictException");
+    } catch (EventConflictException expected) {
+      // expected
+    }
+    RecurringEvent original = (RecurringEvent) model.getAllEvents().get(0);
+    assertEquals(3, original.generateOccurrences().size());
   }
 
   @Test

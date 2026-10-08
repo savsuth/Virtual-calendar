@@ -33,3 +33,8 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Local artifacts ###
+.Rhistory
+# CSVs exported from the repo root by manual runs (examples live in res/)
+/*.csv

@@ -94,4 +94,21 @@ public class CSVImporterTest {
     String result = importer.importData(model, tempFile.getAbsolutePath());
     assertEquals("Imported 1 events.\n1 errors:\nLine 3: Invalid number of fields.\n", result);
   }
+
+  @Test
+  public void importReadsQuotedFieldsWrittenByExporter() throws Exception {
+    File tempFile = File.createTempFile("quoted", ".csv");
+    tempFile.deleteOnExit();
+    try (FileWriter writer = new FileWriter(tempFile)) {
+      writer.write("Subject,Start Date,Start Time,End Date,End Time,AllDayEvent,"
+          + "Description,Location,Private\n");
+      writer.write("\"Lunch, \"\"team\"\"\",2025-06-02,12:00,2025-06-02,13:00,false,"
+          + "\"a, b\",Cafe,false\n");
+    }
+    CalendarModel model = new CalendarModel();
+    String result = new CSVImporter().importData(model, tempFile.getAbsolutePath());
+    assertEquals("Imported 1 events.", result);
+    assertEquals("Lunch, \"team\"", model.getAllEvents().get(0).getSubject());
+    assertEquals("a, b", model.getAllEvents().get(0).getDescription());
+  }
 }

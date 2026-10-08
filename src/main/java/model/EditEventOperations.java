@@ -12,8 +12,10 @@ import java.util.Map;
  */
 public class EditEventOperations implements IEditEventOperations {
 
-  private Map<RecurringEvent, Map<LocalDateTime,
-      SingleEvent>> recurringOverrides = new HashMap<>();
+  private static boolean isTimeProperty(String property) {
+    return property.equalsIgnoreCase("start") || property.equalsIgnoreCase("startdatetime")
+        || property.equalsIgnoreCase("end") || property.equalsIgnoreCase("enddatetime");
+  }
 
   /**
    * Edits an event’s property based on the specified mode.
@@ -29,20 +31,30 @@ public class EditEventOperations implements IEditEventOperations {
   @Override
   public void editEvent(ICalendarModel model, String subject, LocalDateTime from, String property,
       String newValue, ICalendarService.EditMode mode) throws Exception {
+    if (mode != ICalendarService.EditMode.SINGLE && isTimeProperty(property)) {
+      // Checked before anything is mutated: a FROM split used to truncate the
+      // series and only then reject the time change.
+      throw new UnsupportedOperationException(
+          "Start and end can only be edited one event at a time (SINGLE mode).");
+    }
     boolean edited = false;
     List<Event> events = model.getAllEvents();
     List<Event> newRecurringEvents = new ArrayList<>();
+    Map<RecurringEvent, LocalDate> truncatedSeries = new HashMap<>();
 
     for (Event event : events) {
       if (!event.getSubject().equalsIgnoreCase(subject)) {
         continue;
       }
       if (!(event instanceof RecurringEvent)) {
-        if (mode != ICalendarService.EditMode.SINGLE) {
-          throw new UnsupportedOperationException(
-              "For non-recurring events, only SINGLE mode is allowed.");
-        }
-        if (event.getStartDateTime().equals(from)) {
+        // A standalone event sharing the subject is part of the same logical
+        // set: ALL edits it, FROM edits it when it starts at or after `from`.
+        boolean matches = mode == ICalendarService.EditMode.ALL
+            || (mode == ICalendarService.EditMode.SINGLE
+            && event.getStartDateTime().equals(from))
+            || (mode == ICalendarService.EditMode.FROM
+            && !event.getStartDateTime().isBefore(from));
+        if (matches) {
           updateEvent((AbstractEvent) event, property, newValue, model);
           edited = true;
         }
@@ -60,9 +72,14 @@ public class EditEventOperations implements IEditEventOperations {
           for (SingleEvent occ : occs) {
             if (occ.getStartDateTime().equals(from)) {
               SingleEvent overrideOcc = createOverride(occ, property, newValue);
-              recurringOverrides
-                  .computeIfAbsent(re, k -> new HashMap<>())
-                  .put(occ.getStartDateTime(), overrideOcc);
+              LocalDate day = occ.getStartDateTime().toLocalDate();
+              re.excludeDate(day);
+              try {
+                model.addEvent(overrideOcc, overrideOcc.isAutoDecline());
+              } catch (EventConflictException e) {
+                re.includeDate(day);
+                throw e;
+              }
               found = true;
               edited = true;
               break;
@@ -85,6 +102,7 @@ public class EditEventOperations implements IEditEventOperations {
           }
           LocalDate earliestFutureDay = futureOccs.get(0).getStartDateTime().toLocalDate();
           LocalDate dayBefore = earliestFutureDay.minusDays(1);
+          truncatedSeries.put(re, re.getRecurrenceEndDate());
           re.setRecurrenceEndDate(dayBefore);
           RecurringEvent newRe = createSplitRecurringEvent(re, futureOccs, property,
               newValue, model);
@@ -96,9 +114,15 @@ public class EditEventOperations implements IEditEventOperations {
           throw new UnsupportedOperationException();
       }
     }
-    for (Event newEvent : newRecurringEvents) {
-      model.addEvent(newEvent,
-          newEvent instanceof AbstractEvent && newEvent.isAutoDecline());
+    try {
+      for (Event newEvent : newRecurringEvents) {
+        model.addEvent(newEvent,
+            newEvent instanceof AbstractEvent && newEvent.isAutoDecline());
+      }
+    } catch (EventConflictException e) {
+      // A rejected split must not leave the original series cut short.
+      truncatedSeries.forEach(RecurringEvent::setRecurrenceEndDate);
+      throw e;
     }
     if (!edited) {
       throw new Exception("No matching event found to edit.");
@@ -210,6 +234,7 @@ public class EditEventOperations implements IEditEventOperations {
         newStart, newEnd, oldRe.getDescription(), oldRe.getLocation(), oldRe.isPublic(),
         oldRe.getRecurrenceDays(), oldRe.getOccurrenceCount(), lastDay);
     newRe.setAutoDecline(true);
+    oldRe.getExcludedDates().forEach(newRe::excludeDate);
     updateEvent(newRe, property, newValue, model);
     return newRe;
   }

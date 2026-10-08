@@ -1,10 +1,11 @@
 # Virtual Calendar Application
 
+[![CI](https://github.com/savsuth/Virtual-calendar/actions/workflows/ci.yml/badge.svg)](https://github.com/savsuth/Virtual-calendar/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java](https://img.shields.io/badge/Java-11%2B-red.svg)](https://www.oracle.com/java/)
 [![Maven](https://img.shields.io/badge/Maven-3.6+-blue.svg)](https://maven.apache.org/)
 
-> **New in Sprint 4:** Java Swing GUI with month view and analytics dashboard, CSV import, and unified controller across CLI, headless, and GUI modes.
+> **New in Sprint 4:** Java Swing GUI with month view, CSV import, and unified controller across CLI, headless, and GUI modes.
 > **Full changelog →** [`changelog.md`](changelog.md)
 
 ## Overview
@@ -28,7 +29,7 @@ This project implements a comprehensive virtual calendar application that mimics
 
 ### Test Coverage and Quality Assurance
 ![Mutation Testing Results](images/Mutation%20Testing.png)
-*Comprehensive mutation testing ensuring **89%** test strength, mutation coverage, and line coverage.*
+*PIT mutation testing (model and controller): **90%** test strength, **78%** of 838 mutations killed, **89%** line coverage of mutated classes.*
 
 ### Graphical User Interface (NEW)
 ![GUI View](images/GUI.png)
@@ -64,9 +65,9 @@ This project implements a comprehensive virtual calendar application that mimics
 - Seamless integration with external calendar applications
 
 ### **User Interface**
-- **GUI Mode (default)**: Double-click the JAR or run `java -jar Assignment6.jar` to launch the Swing interface.
-- **Interactive Mode**: Real-time command input with immediate feedback (`java -jar Assignment6.jar --mode interactive`).
-- **Headless Mode**: Batch processing from command files (`java -jar Assignment6.jar --mode headless commands.txt`).
+- **GUI Mode (default)**: Double-click the JAR or run `java -jar virtual-calendar.jar` to launch the Swing interface.
+- **Interactive Mode**: Real-time command input with immediate feedback (`java -jar virtual-calendar.jar --mode interactive`).
+- **Headless Mode**: Batch processing from command files (`java -jar virtual-calendar.jar --mode headless commands.txt`).
 
 ## System Architecture
 
@@ -88,38 +89,39 @@ The application follows the MVC pattern with clear separation of concerns:
 ## How to Run the Program
 
 ### Prerequisites
-- Java JDK 8 or later installed on your system
-- Command prompt or terminal
-- JUnit 4 for running tests
+- Java 11 or later
+- Maven 3.6+ only if you build from source
 
 ### Running the Application
 
-The application is now distributed as a compiled JAR file for easy execution:
+A prebuilt JAR is in `res/virtual-calendar.jar` (CI also attaches a fresh one to every build):
 
 #### GUI Mode (default)
 ```bash
-java -jar Assignment6.jar
+java -jar res/virtual-calendar.jar
 ```
 Launches the Swing interface.
 
 #### Interactive Mode
 ```bash
-java -jar Assignment6.jar --mode interactive
+java -jar res/virtual-calendar.jar --mode interactive
 ```
 
 #### Headless Mode
 ```bash
-java -jar Assignment6.jar --mode headless headless.txt
+java -jar res/virtual-calendar.jar --mode headless res/headless.txt
 ```
+
+`res/headless.txt` is a full demo script covering multi-calendar timezones, recurring events, every edit mode, copying across calendars, and CSV export.
 
 ### Development Setup (Optional)
 
 For development and testing purposes:
 
 #### Method 1: Using Maven (Recommended)
-1. **Build the Project:**
+1. **Build the Project** (runs the tests and coverage gate, writes `target/virtual-calendar.jar`):
    ```bash
-   mvn clean compile
+   mvn clean verify
    ```
 
 2. **Run Interactive Mode:**
@@ -150,34 +152,26 @@ For development and testing purposes:
 - **Individual Editing**: Modify single instances or entire series
 
 ### Data Persistence
-- **CSV Export**: Google Calendar compatible format
-- **Command History**: Track all operations for audit trails
+- **CSV Export**: Google Calendar compatible format, with commas and quotes in subjects, descriptions and locations quoted per RFC 4180
+- **CSV Import**: Reads the same format back, including quoted fields
 - **Batch Processing**: Execute multiple commands from files
 
 ## Testing and Quality Assurance
 
-### Automated CI/CD Pipeline
-Our GitHub Actions workflow automatically runs on every push and pull request to the main branch:
+### Automated CI Pipeline
+GitHub Actions runs `mvn verify` on JDK 11 for every push and pull request to `main`:
 
-- **Unit Tests**: 450+ comprehensive test cases with JUnit 4
-- **Code Coverage**: JaCoCo reports with 85%+ line coverage threshold
-- **Mutation Testing**: PIT framework ensuring 89% mutation coverage
-- **Quality Gates**: Automated coverage thresholds and build validation
-- **Artifact Generation**: Automatic JAR builds and test report uploads
+- **Unit Tests**: 314 JUnit 4 tests; any failure fails the build
+- **Coverage Gate**: JaCoCo fails the build below 85% line or 70% branch coverage (currently about 88% line, 74% branch; the Swing view is excluded)
+- **Artifacts**: test and coverage reports kept 30 days, the built `virtual-calendar.jar` kept 90 days
 
-### CI/CD Features
-- **Parallel Testing**: Fast execution with Maven dependency caching
-- **Coverage Reports**: Automated JaCoCo and PIT report generation
-- **Quality Enforcement**: Build fails if coverage drops below 85%
-- **Artifact Storage**: 30-day retention for test reports, 90-day for JARs
-- **PR Integration**: Automatic coverage comments on pull requests
+### Mutation Testing
+PIT runs on demand rather than in CI. Last run: 838 mutations, 78% killed, 90% test strength.
 
 ### Running Tests Locally
 ```bash
-mvn clean test                                    # Run unit tests with JaCoCo
-mvn jacoco:report                                # Generate coverage report
-mvn org.pitest:pitest-maven:mutationCoverage     # Run mutation testing
-mvn verify                                       # Run all tests with quality gates
+mvn clean verify                                 # Tests, coverage report and coverage gate
+mvn org.pitest:pitest-maven:mutationCoverage     # Mutation testing (run on JDK 11; PIT 1.15 fails on JDK 24)
 ```
 
 ### Test Reports Location
@@ -222,21 +216,23 @@ mvn verify                                       # Run all tests with quality ga
   - The calendar can be exported to a CSV file.
 - **Editing Events:**  
   - Basic editing of events is supported (subject, description, location, start time, and end time).  
-  - Supports SINGLE, FROM, and ALL modes for editing.
+  - SINGLE edits one occurrence of a series without touching the rest; FROM and ALL apply to every event sharing the subject, recurring or standalone.
+  - A SINGLE or FROM edit on a series that would cause a conflict is rejected and the series is left as it was.
 
 - **Graphical User Interface:**
-  - Month view navigation, day detail pop-ups, drag-to-create events.
+  - Month view navigation, day detail pop-ups, dialogs to create and edit single or recurring events.
 
 - **Import from CSV:**
   - Bulk event import compatible with Google Calendar CSV export.
 
 ## Resources and Documentation
 
-- **Complete Documentation**: Available in `/docs` folder (Javadoc generated)
-- **Executable JAR**: Ready-to-run application in `/res/Assignment6.jar`
-- **Demo Commands**: Demonstration commands in `/res/headless.txt`
-- **UML Diagrams**: Complete system architecture in `/res/UML Diagram.pdf`
-- **Test Reports**: Mutation testing reports in `/res/pit-reports/`
+- **API Documentation**: Generate Javadoc locally with `mvn javadoc:javadoc` (output in `target/site/apidocs/`)
+- **Design Notes**: Sprint 2 design notes in `docs/Sprint2.md`
+- **Executable JAR**: Ready-to-run application in `res/virtual-calendar.jar`
+- **Demo Commands**: Demonstration commands in `res/headless.txt`
+- **UML Diagrams**: System architecture in `images/UML Diagram/`
+- **Example Exports**: Sample CSVs in `res/Generated Calendar Examples/`
 
 
 ## Acknowledgments

@@ -9,9 +9,11 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.junit.After;
 import org.junit.Before;
@@ -134,6 +136,26 @@ public class CSVExporterTest {
     String filePath = exporter.export(calendar, testFile);
     assertNotNull("File path returned should not be null.", filePath);
     assertTrue("File path should contain the test file name.", filePath.contains(testFile));
+  }
+
+  @Test
+  public void exportWritesToAbsolutePathUnchanged() throws Exception {
+    File target = new File(Files.createTempDirectory("vc-export").toFile(), "abs.csv");
+    String written = new CSVExporter().export(new CalendarModel(), target.getAbsolutePath());
+    assertEquals(target.getAbsolutePath(), written);
+    assertTrue(target.exists());
+  }
+
+  @Test
+  public void exportQuotesFieldsContainingCommasAndQuotes() throws Exception {
+    CalendarModel model = new CalendarModel();
+    model.addEvent(new SingleEvent("Lunch, \"team\"", LocalDateTime.of(2025, 6, 2, 12, 0),
+        LocalDateTime.of(2025, 6, 2, 13, 0), "a, b", "Cafe", true), false);
+    File target = new File(Files.createTempDirectory("vc-export").toFile(), "q.csv");
+    new CSVExporter().export(model, target.getAbsolutePath());
+    List<String> lines = Files.readAllLines(target.toPath());
+    assertEquals("\"Lunch, \"\"team\"\"\",2025-06-02,12:00,2025-06-02,13:00,false,"
+        + "\"a, b\",Cafe,false", lines.get(1));
   }
 
 }

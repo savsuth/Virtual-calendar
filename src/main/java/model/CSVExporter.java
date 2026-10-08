@@ -26,14 +26,14 @@ public class CSVExporter implements Exporter {
     String privateFlag = se.isPublic() ? "false" : "true";
 
     StringBuilder row = new StringBuilder();
-    row.append(se.getSubject()).append(",");
+    row.append(CsvFormat.field(se.getSubject())).append(",");
     row.append(start.toLocalDate()).append(",");
     row.append(start.toLocalTime()).append(",");
     row.append(end.toLocalDate()).append(",");
     row.append(end.toLocalTime()).append(",");
     row.append(allDay).append(",");
-    row.append(se.getDescription()).append(",");
-    row.append(se.getLocation()).append(",");
+    row.append(CsvFormat.field(se.getDescription())).append(",");
+    row.append(CsvFormat.field(se.getLocation())).append(",");
     row.append(privateFlag);
 
     writer.write(row.toString());
@@ -65,7 +65,8 @@ public class CSVExporter implements Exporter {
    */
   @Override
   public String export(ICalendarModel calendar, String fileName) throws IOException {
-    String filePath = Paths.get(System.getProperty("user.dir"), fileName).toString();
+    // resolve() keeps an absolute fileName as-is and anchors a relative one at the working dir.
+    String filePath = Paths.get(System.getProperty("user.dir")).resolve(fileName).toString();
     try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
       writer.write("Subject,Start Date,Start Time,End Date,End Time,AllDayEvent,"
           + "Description,Location,Private");

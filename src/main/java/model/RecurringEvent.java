@@ -4,6 +4,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -12,9 +13,12 @@ import java.util.Set;
  */
 public class RecurringEvent extends AbstractEvent {
 
+  private static final int DAYS_PER_WEEK = 7;
+
   private Set<DayOfWeek> recurrenceDays;
   private int occurrenceCount = -1;
   private LocalDate recurrenceEndDate;
+  private final Set<LocalDate> excludedDates = new HashSet<>();
 
   /**
    * Constructs a RecurringEvent with the specified parameters.
@@ -46,6 +50,13 @@ public class RecurringEvent extends AbstractEvent {
       throw new IllegalArgumentException("Either occurrence count or "
           + "recurrence end date must be provided.");
     }
+    if (recurrenceDays == null || recurrenceDays.isEmpty()) {
+      throw new IllegalArgumentException("At least one recurrence day "
+          + "must be provided.");
+    }
+    if (occurrenceCount != -1 && occurrenceCount <= 0) {
+      throw new IllegalArgumentException("Occurrence count must be positive.");
+    }
     this.endDateTime = endDateTime;
     this.recurrenceDays = recurrenceDays;
     this.occurrenceCount = occurrenceCount;
@@ -61,16 +72,28 @@ public class RecurringEvent extends AbstractEvent {
     List<SingleEvent> occurrences = new ArrayList<>();
     LocalDate currentDate = startDateTime.toLocalDate();
     int count = 0;
-    while (true) {
+    // Belt-and-suspenders bound, derived from the config so it can never
+    // truncate a valid series: the constructor guarantees >= 1 recurrence day,
+    // so a count-based series completes within occurrenceCount weeks.
+    long countBound = (long) occurrenceCount * DAYS_PER_WEEK + DAYS_PER_WEEK;
+    LocalDate hardStop = recurrenceEndDate != null
+        ? recurrenceEndDate
+        : currentDate.plusDays(countBound);
+    while (!currentDate.isAfter(hardStop)) {
       if (recurrenceDays.contains(currentDate.getDayOfWeek())) {
-        LocalDateTime occurrenceStart = LocalDateTime.of(currentDate, startDateTime.toLocalTime());
-        LocalDateTime occurrenceEnd = LocalDateTime.of(currentDate, endDateTime.toLocalTime());
-        try {
-          SingleEvent occurrence = new SingleEvent(subject, occurrenceStart,
-              occurrenceEnd, description, location, isPublic);
-          occurrences.add(occurrence);
-        } catch (InvalidDateException e) {
-          // In case of an invalid occurrence, skip to the next date.
+        // An excluded date still counts toward occurrenceCount: its slot is
+        // filled by a standalone edited copy, so the series must not grow.
+        if (!excludedDates.contains(currentDate)) {
+          LocalDateTime occurrenceStart =
+              LocalDateTime.of(currentDate, startDateTime.toLocalTime());
+          LocalDateTime occurrenceEnd = LocalDateTime.of(currentDate, endDateTime.toLocalTime());
+          try {
+            SingleEvent occurrence = new SingleEvent(subject, occurrenceStart,
+                occurrenceEnd, description, location, isPublic);
+            occurrences.add(occurrence);
+          } catch (InvalidDateException e) {
+            // In case of an invalid occurrence, skip to the next date.
+          }
         }
         count++;
         if (occurrenceCount != -1 && count >= occurrenceCount) {
@@ -78,9 +101,6 @@ public class RecurringEvent extends AbstractEvent {
         }
       }
       currentDate = currentDate.plusDays(1);
-      if (recurrenceEndDate != null && currentDate.isAfter(recurrenceEndDate)) {
-        break;
-      }
     }
     return occurrences;
   }
@@ -126,6 +146,34 @@ public class RecurringEvent extends AbstractEvent {
 
   public void setRecurrenceEndDate(LocalDate newEndDate) {
     this.recurrenceEndDate = newEndDate;
+  }
+
+  /**
+   * Removes the occurrence on the given date from this series, so a standalone edited copy can
+   * take its place.
+   *
+   * @param date the occurrence date to exclude
+   */
+  public void excludeDate(LocalDate date) {
+    excludedDates.add(date);
+  }
+
+  /**
+   * Restores an occurrence previously removed with {@link #excludeDate(LocalDate)}.
+   *
+   * @param date the occurrence date to restore
+   */
+  public void includeDate(LocalDate date) {
+    excludedDates.remove(date);
+  }
+
+  /**
+   * Returns the dates excluded from this series.
+   *
+   * @return an unmodifiable copy of the excluded dates
+   */
+  public Set<LocalDate> getExcludedDates() {
+    return Set.copyOf(excludedDates);
   }
 
 

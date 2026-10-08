@@ -147,4 +147,13 @@ public class CalendarModelTest {
     LocalDateTime afterTime = LocalDateTime.of(2025, 3, 10, 14, 30);
     assertFalse("Calendar should not be busy after the event.", calendar.isBusyAt(afterTime));
   }
+
+  @Test
+  public void isBusyAtExactStartButNotAtExactEnd() throws Exception {
+    CalendarModel model = new CalendarModel();
+    model.addEvent(new SingleEvent("Review", LocalDateTime.of(2025, 6, 2, 9, 0),
+        LocalDateTime.of(2025, 6, 2, 10, 0), "", "", true), false);
+    assertTrue(model.isBusyAt(LocalDateTime.of(2025, 6, 2, 9, 0)));
+    assertFalse(model.isBusyAt(LocalDateTime.of(2025, 6, 2, 10, 0)));
+  }
 }

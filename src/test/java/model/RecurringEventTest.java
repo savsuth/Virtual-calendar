@@ -192,4 +192,54 @@ public class RecurringEventTest {
         recurring.getRecurrenceEndDate());
   }
 
+  @Test(expected = IllegalArgumentException.class)
+  public void testEmptyRecurrenceDaysRejected() throws InvalidDateException {
+    LocalDateTime start = LocalDateTime.of(2025, 3, 3, 9, 0);
+    LocalDateTime end = LocalDateTime.of(2025, 3, 3, 9, 15);
+    // Empty day set + count-based recurrence used to loop forever in
+    // generateOccurrences(); the constructor must reject it now.
+    new RecurringEvent("Bad", start, end, "", "", true, new HashSet<>(), 5, null);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testNullRecurrenceDaysRejected() throws InvalidDateException {
+    LocalDateTime start = LocalDateTime.of(2025, 3, 3, 9, 0);
+    LocalDateTime end = LocalDateTime.of(2025, 3, 3, 9, 15);
+    new RecurringEvent("Bad", start, end, "", "", true, null, 5, null);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testNonPositiveOccurrenceCountRejected() throws InvalidDateException {
+    LocalDateTime start = LocalDateTime.of(2025, 3, 3, 9, 0);
+    LocalDateTime end = LocalDateTime.of(2025, 3, 3, 9, 15);
+    Set<DayOfWeek> days = new HashSet<>();
+    days.add(DayOfWeek.MONDAY);
+    new RecurringEvent("Bad", start, end, "", "", true, days, 0, null);
+  }
+
+  @Test(timeout = 2000)
+  public void testGenerateOccurrencesTerminatesWithNoMatchInWindow() throws InvalidDateException {
+    // Start Tue Mar 4, recur only on Monday, end Sun Mar 9: the window contains
+    // no Monday, so generation must terminate (via the end date) with 0 results.
+    LocalDateTime start = LocalDateTime.of(2025, 3, 4, 9, 0);
+    LocalDateTime end = LocalDateTime.of(2025, 3, 4, 9, 15);
+    Set<DayOfWeek> days = new HashSet<>();
+    days.add(DayOfWeek.MONDAY);
+    RecurringEvent re = new RecurringEvent("Bounded", start, end, "", "", true, days, -1,
+        LocalDate.of(2025, 3, 9));
+    assertEquals("No Monday in the window.", 0, re.generateOccurrences().size());
+  }
+
+  @Test(timeout = 2000)
+  public void testGenerateOccurrencesNotTruncatedForLongSeries() throws InvalidDateException {
+    // A weekly series of 500 occurrences must not be silently capped.
+    LocalDateTime start = LocalDateTime.of(2025, 3, 3, 9, 0);
+    LocalDateTime end = LocalDateTime.of(2025, 3, 3, 9, 15);
+    Set<DayOfWeek> days = new HashSet<>();
+    days.add(DayOfWeek.MONDAY);
+    RecurringEvent re = new RecurringEvent("Long", start, end, "", "", true, days, 500, null);
+    assertEquals("All 500 occurrences must be generated.", 500,
+        re.generateOccurrences().size());
+  }
+
 }

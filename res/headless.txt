@@ -26,13 +26,13 @@ print events on 2023-09-10
 edit events subject LaunchPrep with ProductLaunch
 print events from 2023-09-05T00:00 to 2023-09-15T23:59
 print events on 2023-09-10
-show status on 2023-09-05T14:30
+show status on 2023-09-06T14:30
 show status on 2023-09-05T10:00
 export cal ProductLaunch.csv
 create calendar --name Delta --timezone America/Los_Angeles
 create calendar --name Omega --timezone Europe/Berlin
 use calendar --name Delta
-create event TeamMeeting from 2025-07-15T15:00 to 2025-07-15T16:00 repeats F for 4 times
+create event TeamMeeting from 2025-07-15T15:00 to 2025-07-15T16:00 repeats T for 4 times
 create event CodeReview from 2025-07-16T11:00 to 2025-07-16T12:00
 print events from 2025-07-15T00:00 to 2025-07-21T23:59
 use calendar --name Omega

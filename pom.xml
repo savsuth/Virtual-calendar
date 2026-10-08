@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>org.example</groupId>
-  <artifactId>Assignment6</artifactId>
+  <artifactId>virtual-calendar</artifactId>
   <version>1.0-SNAPSHOT</version>
 
   <properties>
@@ -31,6 +31,7 @@
   </dependencies>
 
   <build>
+    <finalName>virtual-calendar</finalName>
     <plugins>
       <!-- Maven Surefire Plugin for running tests -->
       <plugin>
@@ -50,7 +51,8 @@
           <forkCount>1</forkCount>
           <reuseForks>true</reuseForks>
           <failIfNoTests>false</failIfNoTests>
-          <testFailureIgnore>true</testFailureIgnore>
+          <!-- Tests run from target/ so files they export land in a cleaned, ignored directory. -->
+          <workingDirectory>${project.build.directory}</workingDirectory>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
           <trimStackTrace>false</trimStackTrace>
           <printSummary>true</printSummary>
@@ -107,12 +109,17 @@
                     <limit>
                       <counter>LINE</counter>
                       <value>COVEREDRATIO</value>
-                      <minimum>0.50</minimum>
+                      <minimum>0.85</minimum>
+                    </limit>
+                    <limit>
+                      <counter>BRANCH</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.70</minimum>
                     </limit>
                   </limits>
                 </rule>
               </rules>
-              <haltOnFailure>false</haltOnFailure>
+              <haltOnFailure>true</haltOnFailure>
             </configuration>
           </execution>
         </executions>

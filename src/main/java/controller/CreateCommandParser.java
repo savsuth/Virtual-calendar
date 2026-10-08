@@ -180,6 +180,10 @@ public class CreateCommandParser implements ICommandParser {
    * @throws IllegalArgumentException if an invalid weekday character is provided
    */
   private Set<DayOfWeek> parseWeekdays(String weekdaysStr) {
+    if (weekdaysStr == null || weekdaysStr.trim().isEmpty()) {
+      throw new IllegalArgumentException("At least one recurrence weekday "
+          + "must be provided (e.g. MWF).");
+    }
     Set<DayOfWeek> days = new HashSet<>();
     for (char ch : weekdaysStr.toCharArray()) {
       switch (Character.toUpperCase(ch)) {

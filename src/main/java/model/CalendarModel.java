@@ -100,7 +100,7 @@ public class CalendarModel implements ICalendarModel {
       for (Event occurrence : event.getOccurrences()) {
         if (occurrence instanceof SingleEvent) {
           Event se = occurrence;
-          if (se.getStartDateTime().isBefore(dateTime) && se.getEffectiveEndDateTime()
+          if (!se.getStartDateTime().isAfter(dateTime) && se.getEffectiveEndDateTime()
               .isAfter(dateTime)) {
             return true;
           }
